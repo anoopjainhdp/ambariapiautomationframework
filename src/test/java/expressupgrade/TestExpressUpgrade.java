@@ -13,6 +13,7 @@ import com.hwx.utils.config.ConfigProperties;
 import com.hwx.utils.validation.ValidationUtils;
 import common.TestBase;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -75,10 +76,13 @@ public class TestExpressUpgrade extends TestBaseUpgrade {
     @Test   //(dependsOnMethods = { "testBasicUpgrade" })
     public void testBasicDowngrade() throws Exception {
         try {
-            registerVersionAndInstallPackages();
+            checkDowngradeSupportForStack();
 
+            registerVersionAndInstallPackages();
             stackUpgrade.submitExpressUpgradeTillFinalize(upgradeParams);
+
             printUpgradeOutput();
+
             postUpgradeValidations();
             stackUpgrade.submitDowngradeAfterExpressUpgrade();
 
@@ -163,7 +167,8 @@ public class TestExpressUpgrade extends TestBaseUpgrade {
 
     @Test
     public void sampleTC() throws Exception {
-        postUpgradeValidations();
+        System.out.println(stackUpgrade.getInstalledStackVersion());
+        System.out.println(stackUpgrade.getCurrentStackVersion());
     }
 
     @Test

@@ -1,5 +1,8 @@
 {
     "split1": [
-        "TestExpressUpgrade"
+        "TestExpressUpgradeST#dryRunTC1"
+    ],
+    "split2": [
+        "TestExpressUpgradeST#dryRunTC2"
     ]
 }

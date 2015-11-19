@@ -3,6 +3,7 @@ package com.hwx;
 import com.hwx.ambariapilib.AmbariManager;
 import com.hwx.ambariapilib.host.Host;
 import com.hwx.ambariapilib.json.upgrade.UpgradeStatusJson;
+import com.hwx.ambariapilib.service.ServiceAlerts;
 import com.hwx.ambariapilib.upgrade.ExpressUpgrade;
 import com.hwx.ambariapilib.upgrade.StackUpgrade;
 import com.hwx.utils.logging.LogManager;
@@ -160,11 +161,25 @@ public class DemoTest {
 
     @Test
     public void testCommandRemotely(){
-        LinuxCommandExecutor lex = new LinuxCommandExecutor("172.22.91.194", "root",new String[] {"ls -l | grep ambari"});
+        LinuxCommandExecutor lex = new LinuxCommandExecutor("172.22.101.164", "root",new String[] {"ambari-server status"});
         String value = lex.executeCommandSequenceRemotely(Types_Of_Data.OUTPUT, IGNORE_ERRORS.FALSE);
         int exitCode = lex.getExitCode();
         logger.logInfo(value);
         logger.logInfo("Exit code: " +exitCode);
+    }
+
+    @Test
+    public void testAlerts() {
+        ServiceAlerts obj = new ServiceAlerts("http://172.22.101.164:8080/api/v1/clusters/cl1/services/HDFS");
+        System.out.println("COUNT OF OK ALERTS " + obj.getOkAlertsCount());
+        System.out.println("COUNT OF WARNINGS ALERTS " + obj.getWarningAlerts());
+        System.out.println("COUNT OF UNKNOWN ALERTS " + obj.getUnknownAlertsCount());
+        System.out.println("COUNT OF CRITICAL ALERTS " + obj.getCriticalAlertsCount());
+        System.out.println("CRITICAL ALERT HREF" + obj.getCriticalAlerts());
+        System.out.println("Array of OK ALERT HREF" + obj.getOkAlerts());
+        System.out.println("Array of CRITICAL ALERT HREF" + obj.getCriticalAlerts());
+        System.out.println("Array of UNKNOWN ALERT HREF" + obj.getUnknownAlerts());
+        System.out.println("Array of WARNINGS ALERT HREF" + obj.getWarningAlerts());
     }
 }
 
