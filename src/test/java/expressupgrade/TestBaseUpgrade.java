@@ -1,16 +1,24 @@
 package expressupgrade;
 
+import com.hwx.ambariapilib.AmbariManager;
 import com.hwx.ambariapilib.common.IDConstants;
+import com.hwx.ambariapilib.host.Host;
 import com.hwx.ambariapilib.host.HostComponent;
 import com.hwx.ambariapilib.service.Service;
 import com.hwx.ambariapilib.upgrade.StackUpgrade;
 import com.hwx.ambariapilib.upgrade.UpgradeParams;
+import com.hwx.utils.LinuxCommandExecutor;
 import com.hwx.utils.WaitUtil;
+import com.hwx.utils.validation.DBValidationUtils;
 import com.hwx.utils.validation.ValidationUtils;
 import common.TestBase;
+import org.testng.Assert;
+import org.testng.SkipException;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,6 +28,41 @@ public class TestBaseUpgrade extends TestBase {
 
     protected StackUpgrade stackUpgrade;
     protected UpgradeParams upgradeParams = new UpgradeParams();
+    String clusterName;
+    private List<String> clusterHosts = new ArrayList<String>();
+    String currentVersion;
+
+    private String getCurrentVersion() throws Exception {
+        if(this.currentVersion == null)
+            setCurrentVersion();
+
+        return this.currentVersion;
+    }
+
+    private void setCurrentVersion() throws Exception {
+            this.currentVersion = stackUpgrade.getCurrentStackVersion();
+    }
+
+    private void populateHosts() {
+        ArrayList<Host> hosts = ambariManager.getClusters().get(0).getHosts();
+
+        for(Host host : hosts)
+            clusterHosts.add(host.getName());
+    }
+
+    private List<String> getClusterHosts() {
+        if (clusterHosts.size() == 0)
+            populateHosts();
+
+        return clusterHosts;
+    }
+
+    public String getClusterName() {
+        if(clusterName == null)
+            this.clusterName = ambariManager.getClusters().get(0).getClusterJson().getClusters().getCluster_name();;
+
+        return this.clusterName;
+    }
 
     protected void postUpgradeValidations() throws Exception {
         String SERVICE_CHECK = "Service Checks";
@@ -67,24 +110,64 @@ public class TestBaseUpgrade extends TestBase {
             throw new Exception("Observed one or more errors as part of post upgrade validations");
         }
 
+        verifyHDPSelectStatus();
+        databaseValidations();
+
+    }
+
+    protected void verifyHDPSelectStatus() throws Exception {
+        String cmdOutput= null;
+        String user = "root";
+
+        for(String host : getClusterHosts()) {
+            try {
+                cmdOutput = LinuxCommandExecutor.executeCommand(host, user, new String[]{"hdp-select status | grep -v " + getCurrentVersion() + " | grep -v None"}[0]);
+            } catch (Exception e) {
+                if (cmdOutput == null)
+                    logger.logInfo("hdp-select status command returned zero output as expected on host " + host);
+                else
+                    throw new Exception("Error in output of hdp-select Got output as " + cmdOutput);
+            }
+        }
+    }
+
+    protected void databaseValidations() throws Exception {
+        logger.logInfo("Performing validation in database tables");
+
+        Assert.assertEquals(DBValidationUtils.verifyCurrentClusterVersion(getClusterName(), getCurrentVersion()), true, "Error while verifying cluster current version");
+        Assert.assertEquals(DBValidationUtils.verifyHostsVersion(getClusterHosts(), getCurrentVersion()), true, "Error while verifying host's current version");
+        Assert.assertEquals(DBValidationUtils.verifyStackRegisteredRepo(getCurrentVersion()), true, "Error while verifying stack repo");
+
+        for(String host : getClusterHosts())
+            Assert.assertEquals(DBValidationUtils.verifyHostComponentsState(host, getCurrentVersion(), clusterName), true, "Error while verifying host component state");
+
+        logger.logInfo("Finished performing validation in database tables");
     }
 
     protected void registerVersionAndInstallPackages() throws Exception {
         stackUpgrade.registerNewVersion(upgradeParams.getStackName() + "-" + upgradeParams.getStackVersion() + "." + upgradeParams.getBuildNumber(),
                 upgradeParams.getStackVersion(), upgradeParams.getBuildNumber(), upgradeParams.getOperatingSystem(), upgradeParams.getHdpBaseUrl(), upgradeParams.getHdpUtilsBaseUrl());
 
+        boolean installSuccess = false;
+
         for (int i=1; i<= IDConstants.INSTALL_PACKAGE_RETRY_COUNT ; i++) {
-            boolean installSuccess = false;
+
             try {
                 stackUpgrade.submitInstallPackageRequest(upgradeParams.getStackName(), upgradeParams.getStackVersion(), upgradeParams.getBuildNumber());
                 WaitUtil.waitForFixedInterval(10);
                 installSuccess = true;
             } catch (Exception e) {
+                e.printStackTrace();
                 logger.logInfo("Retrying Install package " + i + " time");
             }
-            if (installSuccess)
-                break;
+            if (installSuccess) {
+                logger.logInfo("Package Installation successful on all hosts");
+                return;
+            }
         }
+        if(!installSuccess)
+            throw new Exception("Error during package installation. Test execution will abort");
+
     }
 
     /**
@@ -110,4 +193,25 @@ public class TestBaseUpgrade extends TestBase {
         upgradeParams.setHdpBaseUrl(hdpurl);
         upgradeParams.setHdpUtilsBaseUrl(hdpUtilsurl);
     }
+
+    private boolean isDowngradeSupported() throws Exception {
+        String VERSION_TO_CHECK = "2.1";
+        String stackVersion = stackUpgrade.getCurrentStackVersion();
+
+        if(stackVersion.startsWith(VERSION_TO_CHECK)) {
+            logger.logInfo(String.format("Downgrade is not supported for the chosen stack with version %s", stackVersion));
+            return false;
+        }
+        else
+            return true;
+    }
+
+    protected void checkDowngradeSupportForStack() throws Exception {
+        if(!isDowngradeSupported()) {
+            throw new SkipException("Skipping this test as downgrade is unsupported");
+        }
+    }
+
+
+
 }

@@ -25,13 +25,13 @@ public class WaitUtil {
             waitForIncreasingInterval(WaitTime.LONGWAIT,iteration);
             waitTime += WaitTime.LONGWAIT.getTime() * iteration;
 
-            logger.logInfo("Wait for " + (WaitTime.LONGWAIT.getTime() * iteration) + "   Total Wait Time : " + waitTime);
+            logger.logInfo("Wait for " + (WaitTime.LONGWAIT.getTime() * iteration) + " seconds. Total Wait Time : " + waitTime + " seconds");
 
             //Send the request again
             req = new Request(clusterAPIUrl+"/requests/"+requestId);
             requestStatus = req.getRequestDetailJson().getRequests().getRequest_status();
             if(requestStatus.equalsIgnoreCase("FAILED"))
-                throw new Exception("Error during package install operation on one or more nodes");
+                throw new Exception("Error while processing the request: " + req.getRequestDetailJson().getRequests().getRequest_context());
 //            iteration *= 2;
         }
 

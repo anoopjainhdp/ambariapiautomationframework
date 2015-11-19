@@ -92,10 +92,12 @@ public class Service extends AmbariItems {
     }
 
     public void injectServiceCheckFailure() {
+        logger.logInfo("Injecting failure for Service check on all hosts");
         for(String host : getHosts()) {
             LinuxCommandExecutor.executeCommand(host, "root", String.format("for file in `find /var/lib/ambari-agent/ -path */common-services/%s/*/service_check.py`;" +
                     " do  sed -i\".original\" '/def /a \\ \\ \\ \\ raise Fail(\"" + IDConstants.TEST_SERVICE_CHECK_INJECTED_FAILURE + "\")'  $file;  done;", getName()));
         }
+        logger.logInfo("Failure injection complete on all hosts");
     }
 
     public void fixServiceCheckFailure() {

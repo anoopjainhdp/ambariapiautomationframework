@@ -196,7 +196,7 @@ public class LinuxCommandExecutor {
 		return commandsSequence;
 	}
 
-	public static void executeCommand(String host, String user, String command) {
+	public static String executeCommand(String host, String user, String command) {
 		LinuxCommandExecutor commandExecutor= new LinuxCommandExecutor(host, user,new String[] {command});
 		String output = commandExecutor.executeCommandSequenceRemotely(ProcessData.Types_Of_Data.OUTPUT, LinuxCommandExecutor.IGNORE_ERRORS.FALSE);
 		int exitCode = commandExecutor.getExitCode();
@@ -204,5 +204,6 @@ public class LinuxCommandExecutor {
 			logger.logError(String.format("Command %s execution failed with return code %d and output as \n%s", command, exitCode, output));
 			throw new RuntimeException("Command " + command + " execution failed with return code " + exitCode + " and output as " + output);
 		}
+        return output;
 	}
 }
